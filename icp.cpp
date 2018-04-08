@@ -2,6 +2,7 @@
 #include <pcl/io/pcd_io.h>
 #include <pcl/console/time.h>
 #include <pcl/registration/icp.h>
+#include <pcl/registration/gicp.h>
 #include <pcl/features/normal_3d.h>
 #include <pcl/registration/transformation_estimation_point_to_plane.h>
 #include <pcl/visualization/pcl_visualizer.h>
@@ -65,8 +66,12 @@ Eigen::Matrix4f point_to_plane (pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud1,
   pcl::IterativeClosestPoint<pcl::PointNormal, pcl::PointNormal> icp;
   typedef pcl::registration::TransformationEstimationPointToPlane<pcl::PointNormal, pcl::PointNormal> PointToPlane;
   boost::shared_ptr<PointToPlane> point_to_plane(new PointToPlane);
-  icp.setTransformationEstimation(point_to_plane);     // key
-
+  icp.setTransformationEstimation(point_to_plane);// key
+  /*
+  typedef pcl::registration::CorrespondenceEstimationNormalShooting<PointNormal, PointNormal, PointNormal> CorrEstNS;
+  CorrEstNS::Ptr corrEst(new CorrEstNS);
+  icp.setCorrespondenceEstimation(corrEst);
+  */
   icp.setInputSource(src);
   icp.setInputTarget(tgt);
   //icp.setRANSACOutlierRejectionThreshold(ransac_par);
@@ -76,6 +81,7 @@ Eigen::Matrix4f point_to_plane (pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud1,
   pcl::PointCloud<pcl::PointNormal> output;
   icp.align(output);//align 的另一个重载可以设置一个初始矩阵guess
   t.toc_print();
+  cout << "score: " << icp.getFitnessScore() << endl;
   return icp.getFinalTransformation();
 }
 
@@ -103,7 +109,77 @@ Eigen::Matrix4f point_to_point(pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud_source
 	icp.align(output);
 	//std::cout << transformation << std::endl;
   t.toc_print();
+  cout << "score: " << icp.getFitnessScore() << endl;
 	return icp.getFinalTransformation();
+}
+
+float icpPlaneToPlane(PointCloud<PointXYZI>::Ptr src,
+                                PointCloud<PointXYZI>::Ptr tar,
+                                Eigen::Matrix4f& guess,
+                                Eigen::Matrix4f& transform)
+{
+    pcl::GeneralizedIterativeClosestPoint<pcl::PointXYZI, pcl::PointXYZI> icp;//GICP 泛化的ICP，或者叫Plane to Plane ICP
+    icp.setTransformationEpsilon(0.0000000001);
+    icp.setMaxCorrespondenceDistance(2.0);
+    icp.setMaximumIterations(50);
+    icp.setRANSACIterations(20);
+    icp.setInputTarget(tar);
+    icp.setInputSource(src);
+    pcl::PointCloud<pcl::PointXYZI> unused_result;
+    icp.align(unused_result, guess);
+    transform = icp.getFinalTransformation();
+    return icp.getFitnessScore();
+}
+
+Eigen::Matrix4f genTransformation(Eigen::Vector3f& r, Eigen::Vector3f& t)
+{
+    Eigen::AngleAxisf init_rotation_x(r.x(), Eigen::Vector3f::UnitX());
+    Eigen::AngleAxisf init_rotation_y(r.y(), Eigen::Vector3f::UnitY());
+    Eigen::AngleAxisf init_rotation_z(r.z(), Eigen::Vector3f::UnitZ());
+    Eigen::Translation3f init_translation(t.x(), t.y(), t.z());
+    return (init_translation * init_rotation_z * init_rotation_y * init_rotation_x).matrix();
+}
+
+void addNormal(pcl::PointCloud<pcl::PointXYZI>::Ptr cloud,
+	       pcl::PointCloud<pcl::PointXYZINormal>::Ptr cloud_with_normals)
+{
+  pcl::PointCloud<pcl::Normal>::Ptr normals ( new pcl::PointCloud<pcl::Normal> );
+
+  pcl::search::KdTree<pcl::PointXYZI>::Ptr searchTree (new pcl::search::KdTree<pcl::PointXYZI>);
+  searchTree->setInputCloud ( cloud );
+
+  pcl::NormalEstimation<pcl::PointXYZI, pcl::Normal> normalEstimator;
+  normalEstimator.setInputCloud ( cloud );
+  normalEstimator.setSearchMethod ( searchTree );
+  normalEstimator.setKSearch ( 15 );
+  normalEstimator.compute ( *normals );
+
+  pcl::concatenateFields( *cloud, *normals, *cloud_with_normals );
+}
+
+float icpPointToPlane(PointCloud<PointXYZI>::Ptr src,
+                                PointCloud<PointXYZI>::Ptr tar,
+                                Eigen::Matrix4f& guess,
+                                Eigen::Matrix4f& transform)
+{
+    pcl::PointCloud<pcl::PointXYZINormal>::Ptr cloud_source_normals ( new pcl::PointCloud<pcl::PointXYZINormal> () );
+    pcl::PointCloud<pcl::PointXYZINormal>::Ptr cloud_target_normals ( new pcl::PointCloud<pcl::PointXYZINormal> () );
+    pcl::PointCloud<pcl::PointXYZINormal>::Ptr cloud_source_trans_normals ( new pcl::PointCloud<pcl::PointXYZINormal> () );
+
+    addNormal(tar, cloud_target_normals);
+    addNormal(src, cloud_source_normals);
+
+    pcl::IterativeClosestPointWithNormals<pcl::PointXYZINormal, pcl::PointXYZINormal>::Ptr icp (
+       new pcl::IterativeClosestPointWithNormals<pcl::PointXYZINormal, pcl::PointXYZINormal> () );
+    icp->setTransformationEpsilon(0.0000000001);
+    icp->setMaxCorrespondenceDistance(2.0);
+    icp->setMaximumIterations(50);
+    icp->setRANSACIterations(20);
+    icp->setInputSource ( cloud_source_normals ); //
+    icp->setInputTarget ( cloud_target_normals );
+    icp->align (*cloud_source_trans_normals, guess); //
+    transform = icp->getFinalTransformation();
+    return icp->getFitnessScore();
 }
 
 void displayAngel(Eigen::Matrix4f &transformation)
@@ -124,6 +200,8 @@ int main(int argc, char** argv)
 	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_target (new pcl::PointCloud<pcl::PointXYZ>);
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_target_transform (new pcl::PointCloud<pcl::PointXYZ> ());
 	pcl::PointCloud<pcl::PointXYZ>::Ptr Final (new pcl::PointCloud<pcl::PointXYZ>);
+  pcl::PointCloud<pcl::PointXYZ> temp;
+  temp.makeShared();
 
     std::string pcd_source_path,pcd_target_path;
     pcd_source_path ="/home/linglx/Data/calibration_for_four_lidar/old/43-1.pcd";
@@ -141,19 +219,18 @@ int main(int argc, char** argv)
 	}
 	std::cout << "target loaded!" << std::endl;
 
-    Eigen::Matrix4f transform = Eigen::Matrix4f::Identity();
-    readtransformMatrix(transform);
-    pcl::transformPointCloud (*cloud_target, *cloud_target_transform, transform);
+  Eigen::Matrix4f transform = Eigen::Matrix4f::Identity();
+  readtransformMatrix(transform);
 
 	Eigen::Matrix4f transformation = point_to_point(cloud_source, cloud_target);
-    displayAngel(transformation);
+  displayAngel(transformation);
+  pcl::transformPointCloud (*cloud_source, *cloud_target_transform, transformation);
 
-    Eigen::Matrix4f transformation_point_to_plane = point_to_plane(cloud_source, cloud_target);
-    pcl::transformPointCloud (*cloud_source, *Final, transformation_point_to_plane);
+  Eigen::Matrix4f transformation_point_to_plane = point_to_plane(cloud_source, cloud_target);
+  pcl::transformPointCloud (*cloud_source, *Final, transformation_point_to_plane);
+  displayAngel(transformation_point_to_plane);
 
-	// std::cout << transformation << std::endl;
 	// display
-    displayAngel(transformation_point_to_plane);
 	pcl::visualization::PCLVisualizer p;
     p.setWindowName("Could after calibration");
 	pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> src_r_h(Final, 255, 0, 0);
@@ -161,7 +238,7 @@ int main(int argc, char** argv)
 	pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> tgt_h (cloud_target, 0, 0, 255);
 	pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> src_h (cloud_source, 255, 255, 255);
 	p.addPointCloud(Final, src_r_h,"source_r");
-	//p.addPointCloud(cloud_target_transform, tgt_after_transform_h, "target_after_transform");
+	p.addPointCloud(cloud_target_transform, tgt_after_transform_h, "target_after_transform");
 	p.addPointCloud(cloud_target, tgt_h, "target");
 	p.addPointCloud(cloud_source, src_h, "source");
     p.setSize(1200,900);
