@@ -10,9 +10,10 @@
 using namespace pcl;
 using namespace std;
 
-Eigen::Matrix4f PointToPlane(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud1,
-                             pcl::PointCloud<pcl::PointXYZ>::Ptr cloud2,
-                             Eigen::Matrix4f &guess) {
+Eigen::Matrix4f
+PointToPlane(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud1,
+             pcl::PointCloud<pcl::PointXYZ>::Ptr cloud2,
+             Eigen::Matrix4f &guess) {
   pcl::PointCloud<pcl::PointNormal>::Ptr src(
       new pcl::PointCloud<pcl::PointNormal>);
   pcl::copyPointCloud(*cloud1, *src);
