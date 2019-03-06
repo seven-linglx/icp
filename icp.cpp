@@ -1,3 +1,5 @@
+#define ELPP_STL_LOGGING
+#include "easyloggingpp/easylogging++.h"
 #include <iostream>
 #include <pcl/console/time.h>
 #include <pcl/features/normal_3d.h>
@@ -6,6 +8,8 @@
 #include <pcl/registration/icp.h>
 #include <pcl/registration/transformation_estimation_point_to_plane.h>
 #include <pcl/visualization/pcl_visualizer.h>
+
+INITIALIZE_EASYLOGGINGPP
 
 using namespace pcl;
 using namespace std;
@@ -48,7 +52,7 @@ PointToPlane(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud1,
   icp.setTransformationEpsilon(1e-3);
   pcl::PointCloud<pcl::PointNormal> output;
   icp.align(output); // align 的另一个重载可以设置一个初始矩阵guess
-  cout << "score: " << icp.getFitnessScore() << endl;
+  LOG(INFO) << "score: " << icp.getFitnessScore() << endl;
   return icp.getFinalTransformation();
 }
 
@@ -76,7 +80,7 @@ PointToPoint(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_source,
   icp.setMaximumIterations(100);        // 100
   pcl::PointCloud<pcl::PointXYZ> output;
   icp.align(output);
-  cout << "score: " << icp.getFitnessScore() << endl;
+  LOG(INFO) << "score: " << icp.getFitnessScore() << endl;
   return icp.getFinalTransformation();
 }
 
@@ -95,7 +99,7 @@ icpPlaneToPlane(PointCloud<PointXYZI>::Ptr src,
   icp.setInputSource(src);
   pcl::PointCloud<pcl::PointXYZI> unused_result;
   icp.align(unused_result, guess);
-  cout << "score: " << icp.getFitnessScore();
+  LOG(INFO) << "score: " << icp.getFitnessScore();
   return icp.getFinalTransformation();
 }
 
@@ -144,7 +148,7 @@ icpPointToPlane(PointCloud<PointXYZI>::Ptr src,
   icp->setInputSource(cloud_source_normals); //
   icp->setInputTarget(cloud_target_normals);
   icp->align(*cloud_source_trans_normals, guess); //
-  cout << "score: " << icp->getFitnessScore() << endl;
+  LOG(INFO) << "score: " << icp->getFitnessScore() << endl;
   return icp->getFinalTransformation();
 }
 
@@ -169,7 +173,7 @@ void displayAngel(Eigen::Matrix4f &transformation) {
   tx = transformation(0, 3);
   ty = transformation(1, 3);
   tz = transformation(2, 3);
-  std::cout << rx << '\n'
+  LOG(INFO) << rx << '\n'
             << ry << '\n'
             << rz << '\n'
             << tx << '\n'
@@ -188,7 +192,14 @@ run(PointCloud<PointXYZ>::Ptr src,
   return icp(src, tar, guess);
 }
 
+void initLogger(const std::string& fpath)
+{
+	el::Configurations conf(fpath);
+	el::Loggers::reconfigureAllLoggers(conf);
+}
+
 int main(int argc, char **argv) {
+  initLogger("easyloggingpp/log.conf");
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_source(
       new pcl::PointCloud<pcl::PointXYZ>);
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_target(
@@ -205,17 +216,17 @@ int main(int argc, char **argv) {
   // load pcd file
   if (pcl::io::loadPCDFile<pcl::PointXYZ>(pcd_source_path, *cloud_source) ==
       -1) {
-    std::cout << "load source failed!" << std::endl;
+    LOG(INFO) << "load source failed!" << std::endl;
     return -1;
   }
-  std::cout << "source loaded!" << std::endl;
+  LOG(INFO) << "source loaded!" << std::endl;
 
   if (pcl::io::loadPCDFile<pcl::PointXYZ>(pcd_target_path, *cloud_target) ==
       -1) {
-    std::cout << "load target failed!" << std::endl;
+    LOG(INFO) << "load target failed!" << std::endl;
     return -1;
   }
-  std::cout << "target loaded!" << std::endl;
+  LOG(INFO) << "target loaded!" << std::endl;
 
   Eigen::Matrix4f transform = Eigen::Matrix4f::Identity();
 
