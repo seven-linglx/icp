@@ -15,8 +15,8 @@ using namespace pcl;
 using namespace std;
 
 Eigen::Matrix4f
-PointToPlane(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud1,
-             pcl::PointCloud<pcl::PointXYZ>::Ptr cloud2,
+PointToPlane(pcl::PointCloud<pcl::PointXYZI>::Ptr cloud1,
+             pcl::PointCloud<pcl::PointXYZI>::Ptr cloud2,
              Eigen::Matrix4f &guess) {
   pcl::PointCloud<pcl::PointNormal>::Ptr src(
       new pcl::PointCloud<pcl::PointNormal>);
@@ -57,18 +57,18 @@ PointToPlane(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud1,
 }
 
 Eigen::Matrix4f
-PointToPoint(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_source,
-             pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_target,
+PointToPoint(pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_source,
+             pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_target,
              Eigen::Matrix4f &guess)
 {
   // ICP
-  pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> icp;
-  // pcl::IterativeClosestPointWithNormals<pcl::PointXYZ, pcl::PointXYZ> icp;
-  pcl::search::KdTree<pcl::PointXYZ>::Ptr tree1(
-      new pcl::search::KdTree<pcl::PointXYZ>);
+  pcl::IterativeClosestPoint<pcl::PointXYZI, pcl::PointXYZI> icp;
+  // pcl::IterativeClosestPointWithNormals<pcl::PointXYZI, pcl::PointXYZI> icp;
+  pcl::search::KdTree<pcl::PointXYZI>::Ptr tree1(
+      new pcl::search::KdTree<pcl::PointXYZI>);
   tree1->setInputCloud(cloud_source);
-  pcl::search::KdTree<pcl::PointXYZ>::Ptr tree2(
-      new pcl::search::KdTree<pcl::PointXYZ>);
+  pcl::search::KdTree<pcl::PointXYZI>::Ptr tree2(
+      new pcl::search::KdTree<pcl::PointXYZI>);
   tree2->setInputCloud(cloud_target);
   icp.setSearchMethodSource(tree1);
   icp.setSearchMethodTarget(tree2);
@@ -78,7 +78,7 @@ PointToPoint(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_source,
   icp.setTransformationEpsilon(1e-3);
   icp.setEuclideanFitnessEpsilon(0.01); // 0.1
   icp.setMaximumIterations(100);        // 100
-  pcl::PointCloud<pcl::PointXYZ> output;
+  pcl::PointCloud<pcl::PointXYZI> output;
   icp.align(output);
   LOG(INFO) << "score: " << icp.getFitnessScore() << endl;
   return icp.getFinalTransformation();
@@ -182,10 +182,10 @@ void displayAngel(Eigen::Matrix4f &transformation) {
 }
 
 Eigen::Matrix4f
-run(PointCloud<PointXYZ>::Ptr src,
-    PointCloud<PointXYZ>::Ptr tar,
-    Eigen::Matrix4f (*icp)(PointCloud<PointXYZ>::Ptr,
-                           PointCloud<PointXYZ>::Ptr,
+run(PointCloud<PointXYZI>::Ptr src,
+    PointCloud<PointXYZI>::Ptr tar,
+    Eigen::Matrix4f (*icp)(PointCloud<PointXYZI>::Ptr,
+                           PointCloud<PointXYZI>::Ptr,
                            Eigen::Matrix4f&))
 {
   Eigen::Matrix4f guess = Eigen::Matrix4f::Identity();
@@ -200,28 +200,28 @@ void initLogger(const std::string& fpath)
 
 int main(int argc, char **argv) {
   initLogger("easyloggingpp/log.conf");
-  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_source(
-      new pcl::PointCloud<pcl::PointXYZ>);
-  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_target(
-      new pcl::PointCloud<pcl::PointXYZ>);
-  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_target_transform(
-      new pcl::PointCloud<pcl::PointXYZ>());
-  pcl::PointCloud<pcl::PointXYZ>::Ptr Final(new pcl::PointCloud<pcl::PointXYZ>);
-  pcl::PointCloud<pcl::PointXYZ> temp;
+  pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_source(
+      new pcl::PointCloud<pcl::PointXYZI>);
+  pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_target(
+      new pcl::PointCloud<pcl::PointXYZI>);
+  pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_target_transform(
+      new pcl::PointCloud<pcl::PointXYZI>());
+  pcl::PointCloud<pcl::PointXYZI>::Ptr Final(new pcl::PointCloud<pcl::PointXYZI>);
+  pcl::PointCloud<pcl::PointXYZI> temp;
   temp.makeShared();
 
   std::string pcd_source_path, pcd_target_path;
   pcd_source_path = "/home/linglx/Data/calibration_for_four_lidar/old/43-1.pcd";
   pcd_target_path = "/home/linglx/Data/calibration_for_four_lidar/old/45-1.pcd";
   // load pcd file
-  if (pcl::io::loadPCDFile<pcl::PointXYZ>(pcd_source_path, *cloud_source) ==
+  if (pcl::io::loadPCDFile<pcl::PointXYZI>(pcd_source_path, *cloud_source) ==
       -1) {
     LOG(INFO) << "load source failed!" << std::endl;
     return -1;
   }
   LOG(INFO) << "source loaded!" << std::endl;
 
-  if (pcl::io::loadPCDFile<pcl::PointXYZ>(pcd_target_path, *cloud_target) ==
+  if (pcl::io::loadPCDFile<pcl::PointXYZI>(pcd_target_path, *cloud_target) ==
       -1) {
     LOG(INFO) << "load target failed!" << std::endl;
     return -1;
@@ -244,13 +244,13 @@ int main(int argc, char **argv) {
   // display
   pcl::visualization::PCLVisualizer p;
   p.setWindowName("Could after calibration");
-  pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> src_r_h(
+  pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZI> src_r_h(
       Final, 255, 0, 0);
-  pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ>
+  pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZI>
       tgt_after_transform_h(cloud_target_transform, 0, 255, 0);
-  pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> tgt_h(
+  pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZI> tgt_h(
       cloud_target, 0, 0, 255);
-  pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> src_h(
+  pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZI> src_h(
       cloud_source, 255, 255, 255);
   p.addPointCloud(Final, src_r_h, "source_r");
   p.addPointCloud(cloud_target_transform, tgt_after_transform_h,
