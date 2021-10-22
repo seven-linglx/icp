@@ -13,6 +13,7 @@ INITIALIZE_EASYLOGGINGPP
 
 using namespace pcl;
 using namespace std;
+using ICPFunPtr = Eigen::Matrix4f (*)(PointCloud<PointXYZI>::Ptr, PointCloud<PointXYZI>::Ptr, Eigen::Matrix4f&);
 
 Eigen::Matrix4f
 PointToPlane(pcl::PointCloud<pcl::PointXYZI>::Ptr cloud1,
@@ -184,9 +185,7 @@ void displayAngel(Eigen::Matrix4f &transformation) {
 Eigen::Matrix4f
 run(PointCloud<PointXYZI>::Ptr src,
     PointCloud<PointXYZI>::Ptr tar,
-    Eigen::Matrix4f (*icp)(PointCloud<PointXYZI>::Ptr,
-                           PointCloud<PointXYZI>::Ptr,
-                           Eigen::Matrix4f&))
+    ICPFunPtr icp)
 {
   Eigen::Matrix4f guess = Eigen::Matrix4f::Identity();
   return icp(src, tar, guess);
@@ -229,8 +228,13 @@ int main(int argc, char **argv) {
   LOG(INFO) << "target loaded!" << std::endl;
 
   Eigen::Matrix4f transform = Eigen::Matrix4f::Identity();
-
-  Eigen::Matrix4f transformation = run(cloud_source, cloud_target, &PointToPoint);
+	// clang-format off
+	std::map<std::string, ICPFunPtr> icp_map{{"icpPlaneToPlane", &icpPlaneToPlane},
+							                             {"icpPointToPlane", &icpPointToPlane},
+							                             {"PointToPlane", &PointToPlane},
+							                             {"PointToPoint", &PointToPoint}};
+	// clang-format on
+  Eigen::Matrix4f transformation = run(cloud_source, cloud_target, icp_map["PointToPoint"]);
   displayAngel(transformation);
   pcl::transformPointCloud(*cloud_source, *cloud_target_transform,
                            transformation);
