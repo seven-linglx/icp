@@ -1,0 +1,7 @@
+%YAML 1.0
+---
+pcd_source_path: "/path/to/source/pcd"
+pcd_target_path: "/path/to/target/pcd"
+# roll, pitch, yam, x, y, z
+init_params: [0, 0, 0, 0, 0, 0]
+icp_pattern: "PointToPlane"

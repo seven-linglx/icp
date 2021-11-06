@@ -8,6 +8,9 @@
 #include <pcl/registration/icp.h>
 #include <pcl/registration/transformation_estimation_point_to_plane.h>
 #include <pcl/visualization/pcl_visualizer.h>
+#include <yaml-cpp/yaml.h>
+#include <Eigen/src/Core/Matrix.h>
+#include <string>
 
 INITIALIZE_EASYLOGGINGPP
 
@@ -153,9 +156,13 @@ void displayAngel(Eigen::Matrix4f& transformation)
   LOG(INFO) << rx << '\n' << ry << '\n' << rz << '\n' << tx << '\n' << ty << '\n' << tz << std::endl;
 }
 
-Eigen::Matrix4f run(PointCloud<PointXYZI>::Ptr src, PointCloud<PointXYZI>::Ptr tar, ICPFunPtr icp)
+Eigen::Matrix4f
+run(PointCloud<PointXYZI>::Ptr src, PointCloud<PointXYZI>::Ptr tar, const std::vector<float>& params, ICPFunPtr icp)
 {
-  Eigen::Matrix4f guess = Eigen::Matrix4f::Identity();
+  Eigen::Vector3f r(params[0], params[1], params[2]);
+  Eigen::Vector3f t(params[3], params[4], params[5]);
+  // Eigen::Matrix4f guess = Eigen::Matrix4f::Identity();
+  Eigen::Matrix4f guess = genTransformation(r, t);
   return icp(src, tar, guess);
 }
 
@@ -168,6 +175,7 @@ void initLogger(const std::string& fpath)
 int main(int argc, char** argv)
 {
   initLogger("easyloggingpp/log.conf");
+  const auto config = YAML::LoadFile("./config/config.yaml");
   pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_source(new pcl::PointCloud<pcl::PointXYZI>);
   pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_target(new pcl::PointCloud<pcl::PointXYZI>);
   pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_target_transform(new pcl::PointCloud<pcl::PointXYZI>());
@@ -175,9 +183,10 @@ int main(int argc, char** argv)
   pcl::PointCloud<pcl::PointXYZI> temp;
   temp.makeShared();
 
-  std::string pcd_source_path, pcd_target_path;
-  pcd_source_path = "/home/linglx/Data/calibration_for_four_lidar/old/43-1.pcd";
-  pcd_target_path = "/home/linglx/Data/calibration_for_four_lidar/old/45-1.pcd";
+  const auto pcd_source_path = config["pcd_source_path"].as<std::string>();
+  const auto pcd_target_path = config["pcd_target_path"].as<std::string>();
+  const auto init_params = config["init_params"].as<std::vector<float>>();
+  const auto icp_pattern = config["icp_pattern"].as<std::string>();
   // load pcd file
   if (pcl::io::loadPCDFile<pcl::PointXYZI>(pcd_source_path, *cloud_source) == -1)
   {
@@ -200,7 +209,7 @@ int main(int argc, char** argv)
                                            {"PointToPlane", &PointToPlane},
                                            {"PointToPoint", &PointToPoint}};
   // clang-format on
-  Eigen::Matrix4f transformation = run(cloud_source, cloud_target, icp_map["PointToPoint"]);
+  Eigen::Matrix4f transformation = run(cloud_source, cloud_target, init_params, icp_map[icp_pattern]);
   displayAngel(transformation);
   pcl::transformPointCloud(*cloud_source, *cloud_target_transform, transformation);
 
