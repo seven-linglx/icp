@@ -204,19 +204,13 @@ int main(int argc, char** argv)
   displayAngel(transformation);
   pcl::transformPointCloud(*cloud_source, *cloud_target_transform, transformation);
 
-  Eigen::Matrix4f transformation_point_to_plane = run(cloud_source, cloud_target, &PointToPlane);
-  pcl::transformPointCloud(*cloud_source, *Final, transformation_point_to_plane);
-  displayAngel(transformation_point_to_plane);
-
   // display
   pcl::visualization::PCLVisualizer p;
   p.setWindowName("Could after calibration");
-  pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZI> src_r_h(Final, 255, 0, 0);
   pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZI> tgt_after_transform_h(cloud_target_transform, 0, 255,
                                                                                          0);
   pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZI> tgt_h(cloud_target, 0, 0, 255);
   pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZI> src_h(cloud_source, 255, 255, 255);
-  p.addPointCloud(Final, src_r_h, "source_r");
   p.addPointCloud(cloud_target_transform, tgt_after_transform_h, "target_after_transform");
   p.addPointCloud(cloud_target, tgt_h, "target");
   p.addPointCloud(cloud_source, src_h, "source");
