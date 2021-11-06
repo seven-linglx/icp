@@ -1,3 +1,6 @@
+log/
+.cache/
+build/
 cmake*
 .idea
 # Prerequisites
